@@ -35,7 +35,7 @@ riemann.mac
 
 Riemann has exactly one function, riemann(f,x,a,b,n), which is a method of numerically approximating integrals.  It uses the Riemann definition of definite integration (or at least something like it).  Its format is identical to integrate(f,x,a,b), except with the added *n*, which is how many rectangles you want to use in your approximation (higher is better).  For most cases, romberg(f,x,a,b), a native Maxima function, is probably better than riemann and almost certainly faster, but I wanted to have this available for myself because I have run into occasions when romberg fails to converge.
 
-complex.max
+complex.mac
 -----------
 
 Complex has a few tools for complex-valued functions.  Note that it does not automatically declare *z* to be a complex variable.  So, you might want to enter declare(z,complex); before using conjugate(), realpart(), imagpart(), etc.  Again, see the file itself for more detailed comments.
