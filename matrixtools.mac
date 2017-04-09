@@ -1,0 +1,368 @@
+/* Different functions for use in matrices, and some functions for lists.  Note that many functions are incompatible with the rref.mac package I found online because it redefines addrow(), so if you load them both, conflicting commands will cause this one to work incorrectly.  (Restart Maxima to fix it.)  But there is an rref() command in this package, too (which, personally, I like better). */
+
+
+
+/* pivot() pivots the matrix M around the entry in the ith row and the jth column. */
+
+pivot(M,i,j):=
+block(
+Q57:copymatrix(M),
+Q57[i]:(1/M[i,j])*Q57[i],
+for k:1 thru i-1 do Q57[k]:rowop(Q57,k,i,Q57[k,j])[k],
+for k:i+1 thru length(M) do Q57[k]:rowop(Q57,k,i,Q57[k,j])[k],
+Q57);
+
+
+
+
+
+/* pivot_old() is the old version of pivot.  I'm keeping it here just because I don't like to just discard something I've written (also, this is the first script I wrote in Maxima), but the previously defined pivot() should work exactly the same as this one, except faster for especially large matrices.  */
+
+pivot_old(M,i,j):=
+if i=1 then
+
+block(
+Q:row(M,1)/(M[i,j]), 
+for k:2 thru length(M) do Q:addrow(Q,row(M,k)),
+for k:2 thru length(M) do Q:rowop(Q,k,i,Q[k,j]),
+Q)
+
+else
+
+block(
+Q:row(M,1),
+for k:2 thru (i-1) do Q:addrow(Q,row(M,k)),
+Q:addrow(Q,row(M,i)/(M[i,j])),
+for k:(i+1) thru length(M) do Q:addrow(Q,row(M,k)),
+for k:1 thru (i-1) do Q:rowop(Q,k,i,Q[k,j]),
+for k:(i+1) thru length(M) do Q:rowop(Q,k,i,Q[k,j]),
+Q);
+
+
+
+
+
+
+
+/* rowmult() is the elementary row operation row multiplication.  It multiplies the ith row in matrix M by the scalar multiple n.  I changed it to rowmult() to be slightly more consistent with Maxima commands rather than TI-Basic, but mrow() calls rowmult() in case you really like TI-Basic.*/
+
+rowmult(M,i,n):=
+block(
+Q54:copymatrix(M),
+Q54[i]:n*Q54[i],
+Q54);
+
+mrow(M,i,n):=rowmult(M,i,n);
+
+
+
+
+/* randommatrix() returns a matrix with dimensions a,b with pseudorandom numbers using the random() command.  All entries will be integers between -100 and 100, but the code can be fairly easily modified for different ranges or non-integer (but rational and real) values.  randomrow() is an intermediate function used in randommatrix() */
+
+randomrow(a):=
+block(
+Q1:matrix([]),
+for j:1 thru a do
+Q1:addcol(Q1,[100-random(200)]),
+Q1);
+
+randommatrix(a,b):=
+block(
+Q1:randomrow(b),
+for j:1 thru a-1 do
+Q1:addrow(Q1,randomrow(b)),
+Q1);
+
+
+
+
+/* flipmatrix() takes the matrix M and flips it upside down, with the last row becoming the first and the first row becoming the last, etc.  flipmatrix() has absolutely no use whatsoever, but it does work. */
+
+flipmatrix(M):=
+block(
+Q1:matrix(M[length(M)]),
+for k:1 thru length(M)-1 do
+    Q1:addrow(Q1,M[length(M)-k]),
+Q1);
+
+
+
+
+/* rowdim() and coldim() return the length of the row and the length of the column, respectively. They're very simple commands, but they're easier to remember this way.*/
+
+rowdim(M):=length(M);
+coldim(M):=length(transpose(M));
+
+
+
+
+
+/* redech() finds the reduced row echelon form of the matrix M.  This uses entirely my own code (except for native Maxima functions).  It SHOULD also be compatible with nonreal, nonrational entries and undefined variables, and therefore SHOULD be more useful than the rref.mac plugin I found online (though it might be slower for very large matrices).  zerosdown() and ispivotpoint() are functions used by redech(), and redech() also calls pivot().  zerosdown() counts how many zeros are below a certain entry and ispivotpoint() uses zerosdown() to determine if a given entry in an echelon form matrix is a pivot point.  Then redech() uses the echelon() command, then finds the pivot points and pivots around them.  I changed the command from rref to redech to be more consistent with Maxima's commands rather than TI-Basic, but I also put an rref() command that calls redech in case someone gets uptight about it.*/
+
+zerosdown(M,j,k):=
+block(
+q1:[],
+for a:j+1 thru length(M) do
+if M[a,k]=0 then q1:append(q1,[1]),
+length(q1));
+
+ispivotpoint(M,j,k):=
+if M[j,k]=1 and zerosdown(M,j,k)=length(M)-j then 1 else 0;
+
+redech(M):=
+block(
+Q1:echelon(M),
+for j:1 thru rowdim(Q1) do
+for k:1 thru coldim(Q1) do
+if ispivotpoint(Q1,j,k)=1 then Q1:pivot(Q1,j,k),
+Q1);
+
+rref(M):=redech(M);
+
+
+
+
+/*LUDecomp finds the LU Decomposition of the input matrix.  This is something that Maxima already does natively, but this is less tedious and easier to remember. This code is only rearranging the default command.  It should be worth noting that this is a shortcut, and leaves out the permutation matrix which may be important in certain situations.*/
+
+LUDecomp(M):=block(Q:get_lu_factors(lu_factor(M)),[Q[2],Q[3]]);
+
+
+
+/*diag() returns a diagonal matrix wit the diagonal entries being the list L.  There may already be a function that does this, but I couldn't find it.*/
+
+diag(L):=
+block(
+Q:ident(length(L)),
+for k:1 thru length(L) do Q:rowmult(Q,k,L[k]),
+Q);
+
+
+
+
+
+/*sumlist() is a simple command that finds the sum of all of the entries in the list. */
+
+sumlist(L):=sum(L[k],k,1,length(L));
+
+
+
+
+/* inlist() finds out if the element x is somewhere in the list L.  It returns "true" if it is and "false" if it isn't.  It also assigns the number of times that x appears to "howoften."  Note that if L contains lists inside of it, inlist() does NOT check to see if x is inside of those particular lists. inlist() calls sumlist().  */
+
+inlist(x,L):=
+block(
+Q1:[],
+for k:1 thru length(L) do if x=L[k] then Q1:append(Q1,[1]),
+howoften:sumlist(Q1),
+if is(notequal(howoften,0)) then true else false);
+
+
+
+
+
+/*  augment() will append two matrices using the more traditional way.  The command append() will stack two matrices on top of each other, but traditionally matrices are appended by setting them side-by-side.  This just uses three transpositions to accomplish that with the regular append() command.  augment() used to be called appendmatrix(), but both of the commands work now. */
+
+augment(M,N):=
+transpose(append(transpose(M),transpose(N)));
+
+appendmatrix(M,N):=augment(M,N);
+
+
+
+/*leftdiv() is just a shortcut for multiplying the inverse of a square matrix by a vector.  It's essentially the same as Matlab's A\b.  */
+
+
+leftdiv(A,b):=invert(A).b;
+
+
+
+/* invmod() finds the inverse of an invertible matrix mod a. */
+
+invmod(M,a):=
+if 
+    notequal(gcd(determinant(M),a),1) 
+    then 
+        "Matrix not invertible" 
+    else 
+        mod(determinant(M)*mod(determinant(M)^(totient(a)-1),a)*invert(M),a);
+
+
+
+
+/* sortA() and sortD() sort lists in ascending and descending order, respectively.  The regular sort() command is problematic with nonrational numbers, so these versions should be more successful.  They actually use the sort() command, but instead of sorting the numbers the user types in, they list their associated float values, and then list the original values in the displayed sorted list.  So, that means it's done in a fairly inexact way, but it should work 99.999% of the time.  I've also made a variation of them both, sorta() and sortd(), which are exactly the same except the lowercase 'a' and 'd', in case I feel too lazy to capitalize.  */
+
+sortA(L):=
+block(
+Q44:float(L),
+Q45:[],
+for k:1 thru length(L) do Q45:append(Q45,[[Q44[k],L[k]]]),
+Q45:sort(Q45),
+Q46:[],
+for j:1 thru length(Q45) do Q46:append(Q46,[Q45[j][2]]),
+Q46);
+
+sorta(L):=sortA(L);
+
+sortD(L):=
+block(
+Q44:float(L),
+Q45:[],
+for k:1 thru length(L) do Q45:append(Q45,[[Q44[k],L[k]]]),
+Q45:sort(Q45),
+Q46:[],
+for j:1 thru length(Q45) do Q46:append(Q46,[Q45[length(Q45)-j+1][2]]),
+Q46);
+
+sortd(L):=sortD(L);
+
+
+
+
+
+/* location() returns a list of all of the locations of n in the list L.  It may in the future be used to revise the command inlist().  */
+
+
+location(L,n):=
+block(
+Q34:[],
+for k:1 thru length(L) do if L[k]=n then Q34:append(Q34,[k]),
+Q34);
+
+
+
+/* listsection() is a simple command that will return a section of entries from the input list L, starting with m and ending at n.  */
+
+listsection(L,m,n):=
+makelist(L[k],k,m,n);
+
+
+
+/*matd() is a different way of entering matrices which should hopefully be a little easier.  j and k are the number of rows and columns, respectively, and L is a list of every entry in the matrix.  This way you don't have to deal with separating the individual rows and messing with nearly as many brackets, Maxima will do it for you.  If Maxima returns "part: invalid index of list or matrix," that means that you missed or added at least one entry (and it'll be hard to find, unfortunately).  Maxima and wxMaxima ignore line breaks, so you can actually hit enter after every row to keep it organized if you so desire.*/
+
+matd(j,k,L):=
+block(
+Q12:matrix(),
+for a:1 thru j do Q12:addrow(Q12,listsection(L,(a-1)*k+1,a*k)),
+Q12);
+
+
+
+/*mat() is yet another way of entering matrices.  The original idea was something that's slightly more similar to Matlab's matrix syntax, but the result is actually quite a bit more tedious than I expected, which is why I wrote matd() to use instead.  You enter your matrix as a list and your rows separated by n, i.e., mat([1,2,3,n,4,5,6]) will return a 2x3 matrix.  n must not be assigned to anything and must not be an actual entry in the matrix for it to work. This isn't exactly tightly-written code, in fact it's pretty shoddy because it was written in a hurry, but it should work. tomatrix() and listblock() are functions to be used to that end, but I can foresee the name tomatrix possibly being reassigned to a different function in the distant future. */
+
+tomatrix(L):=
+block(
+Q13:matrix(),
+for k:1 thru length(L) do Q13:addrow(Q13,L[k]),
+Q13);
+
+listblock(L,m):=
+block(
+Q12:location(L,n),
+if m=1 then
+listsection(L,1,Q12[1]-1)
+else
+if m=length(Q12)+1 then
+listsection(L,Q12[m-1]+1,length(L))
+else
+listsection(L,Q12[m-1]+1,Q12[m]-1));
+
+mat(L):=
+block(
+Q41:location(L,n),
+Q12:[],
+for j:1 thru length(Q41)+1 do Q12:append(Q12,[listblock(L,j)]),
+tomatrix(Q12));
+
+
+/*gcdm() finds the greatest common divisor of two or more numbers, as opposed to the regular gcd() command which only finds the greatest common divisor of two numbers.  Input should be a list (requiring brackets) of integers in their most simplified form. */
+
+
+gcdm(L):=block(
+for k:1 thru floor(sortD(L)[1]/2) do if floor(L/k)=L/k then Q23:k,
+Q23);
+
+
+
+/* polyval() is similar to Matlab's polyval.  The first argument must be a list, not a matrix.  */
+
+
+polyval(P,x):=sum(P[k]*x^(length(P)-k),k,1,length(P));
+
+
+
+
+/*There's a package called vect that does cross product, norm, dot product, etc., but it changes the "." operation to something other than matrix multiplication, so I don't care for it, so I made these instead for when I need them.  Note that all functions involving vectors are specifically for vectors in Euclidean n-space, not for all inner product spaces. */
+
+
+
+/*cross() finds the cross product of two R^3 vectors whose components are given in list form.  */
+
+cross(P,Q):=
+if is(notequal(length(P),3)) or is(notequal(length(Q),3)) 
+then "Cross product only applies to vectors in Euclidean three-space" 
+else
+[P[2]*Q[3]-Q[2]*P[3],-(P[1]*Q[3]-Q[1]*P[3]),P[1]*Q[2]-Q[1]*P[2]];
+
+
+
+/*norm() finds the 2-norm (length) of a vector whose components are given in list form.  It works for any vector in Euclidean n-space, i.e., real-valued vectors of any length. */
+
+norm(P):=sqrt(sumlist(P^2));
+
+
+
+/*dot() finds the dot product of two vectors.*/
+
+dot(P,Q):=sumlist(P*Q);
+
+
+
+/*angvect() finds the angle between two vectors in radians, and angvectd() approximates the angle in degrees.  angvectd() will more often than not be more practical.  */
+
+angvect(P,Q):=acos(dot(P,Q)/(norm(P)*norm(Q)));
+
+angvectd(P,Q):=float(angvect(P,Q)*180/%pi);
+
+
+
+
+/*unitvect() finds the unit vector that has the same direction as the input. */
+
+unitvect(P):=P/norm(P);
+
+
+
+
+/* gradient() finds the gradient of a function.  Function must be a real-valued function of two real variables.  */
+
+
+gradient(f):=[diff(f,x),diff(f,y)];
+
+
+
+/*directional_diff() finds the directional derivative of the function in the direction of the specified vector.  It currently only works for real-valued functions of two real variables. */
+
+directional_diff(f,u):=dot(gradient(f),u);
+
+
+/* listvect() takes a matrix column vector and turns it into a list form of a row vector.  This makes switching between them easy, because you can switch from a list to a column vector using the transpose command. */
+
+listvect(b):=makelist(b[k,1],k,1,rowdim(b));
+
+
+
+/*makepoly turns a list into a polynomial */
+
+makepoly(L,x):=sum(L[k]*x^(length(L)-k),k,1,length(L));
+
+
+
+/*onenorm, twonorm, infnorm, and pnorm are the corresponding norms. */
+
+onenorm(L):=sum(abs(L[k]),k,1,length(L));
+
+twonorm(L):=sqrt(sum(abs(L[k])^2,k,1,length(L)));
+
+infnorm(L):=sortD(abs(L))[1];
+
+pnorm(L,p):=sum(abs(L[k])^p,k,1,length(L))^(1/p);

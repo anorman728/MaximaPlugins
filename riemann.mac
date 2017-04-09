@@ -1,0 +1,4 @@
+/* Simple function to approximate integrals using the Riemann definition of integration.  f is the function, x is the declared variable, a and b are the limits of integration, and n is the number of rectangles used.  riemann() will always return decimals, never fractions. */
+
+riemann(f,x,a,b,n):=
+nusum(subst((a+(b-a)/n*k),x,f)*(b-a)/n,k,0,n-1);

@@ -1,0 +1,160 @@
+/* comlineint() finds the complex line integral.  f is the function, which must be given in terms of z, zt is the complex parameterization of the curve, which must be given in terms of t, and a and b are the endpoints of the parameterization.  It works by first replacing z with x+iy and then separating the real and imaginary parts of the integral (otherwise Maxima would return wrong answers).  It also makes some effort to simplify the answer (sometimes without much luck). */
+
+comlineint(f,zt,a,b):=
+block(
+rf:realpart(subst(x+%i*y,z,f)),
+imf:imagpart(subst(x+%i*y,z,f)),
+u:realpart(zt),
+v:imagpart(zt),
+up:diff(u,t),
+vp:diff(v,t),
+rfuv:subst(u,x,subst(v,y,rf)),
+imfuv:subst(u,x,subst(v,y,imf)),
+ans:trigsimp(integrate(rfuv*up-imfuv*vp,t,a,b)+%i*integrate(imfuv*up+rfuv*vp,t,a,b)),
+ev(ans,risch)
+);
+
+
+
+/* comlineapp() approximates the complex line integral, using the exact same method as comlineint(), but using the romberg() command instead of integrate()*/
+
+comlineapp(f,zt,a,b):=
+block(
+rf:realpart(subst(x+%i*y,z,f)),
+imf:imagpart(subst(x+%i*y,z,f)),
+u:realpart(zt),
+v:imagpart(zt),
+up:diff(u,t),
+vp:diff(v,t),
+rfuv:subst(u,x,subst(v,y,rf)),
+imfuv:subst(u,x,subst(v,y,imf)),
+romberg(rfuv*up-imfuv*vp,t,a,b)+%i*romberg(imfuv*up+rfuv*vp,t,a,b)
+);
+
+
+
+
+
+/* comlinenum() approximates the complex line integral, very similarly to comlineapp(), but it uses the Riemann definition of integration to approximate the integrals (which is what riemann() is).  comlinenum() requires one additional argument than comelineapp(), n, which is the number of rectangles used in riemann() divided by 1000.   comlinenum()'s accuracy depends on how large n is, but it is very slow even when n is one.  It has the advantage of being less likely to fail than comlineapp().*/
+
+riemann(f,x,a,b,n):=
+nusum(subst((a+(b-a)/n*k),x,f)*(b-a)/n,k,0,n-1);
+
+comlinenum(f,zt,a,b,n):=
+block(
+rf:realpart(subst(x+%i*y,z,f)),
+imf:imagpart(subst(x+%i*y,z,f)),
+u:realpart(zt),
+v:imagpart(zt),
+up:diff(u,t),
+vp:diff(v,t),
+rfuv:subst(u,x,subst(v,y,rf)),
+imfuv:subst(u,x,subst(v,y,imf)),
+riemann(rfuv*up-imfuv*vp,t,a,b,n*1000)+%i*riemann(imfuv*up+rfuv*vp,t,a,b,n*1000)
+);
+
+
+
+/* Note: The function residueold() is now made unnecessary by the discovery that Maxima has a residue() function built-in.  (I didn't bother to check first.)  However, resapp() is still useful when residue() fails (which will happen if you're finding the residue of an essential singularity).  residueold() finds the residue of a function at a certain point.  f is the function (given in terms of z), p is the point, and k the radius of any closed disk around p that does not contain singularities (other than removables and p).  It works by using the comlineint() command with exp(i*t+p) from 0 to 2pi as the parameterization.  It often results in integrals so complicated that they cannot be solved analytically by Maxima.*/
+
+residueold(f,p,k):=(1/(2*%pi*%i))*comlineint(f,k*exp(%i*t)+p,0,2*%pi);
+
+
+
+/*resbox() finds the residue of a function at a certain point, but it uses the parameterization of a box (with sidelength 2*k) surrounding the point p instead of a circle. It also often results in integrals so complicated that they cannot be solved analytically.*/
+
+resbox(f,p,k):=
+(1/(2*%pi*%i))*(comlineint(f,k*(1+%i*t)+p,-1,1)+comlineint(f,k*(-t+%i)+p,-1,1)+comlineint(f,k*(-1-%i*t)+p,-1,1)+comlineint(f,k*(t-%i)+p,-1,1));
+
+
+
+
+/*resapp() is very similar to resbox, with the same format of a box with sidelength 2*k, but instead of using comlineint(), it uses comlineapp(), so it approximates the value of the residue.  Generally speaking, this is much more useful than residueold() or resbox(), but if p is a pole, then respole() (a later function) is the most effective.*/
+
+resapp(f,p,k):=
+rectform(float((1/(2*%pi*%i))*(comlineapp(f,k*(1+%i*t)+p,-1,1)+comlineapp(f,k*(-t+%i)+p,-1,1)+comlineapp(f,k*(-1-%i*t)+p,-1,1)+comlineapp(f,k*(t-%i)+p,-1,1))));
+
+
+
+
+
+/*resnum() is very similar to resapp(), except that it uses comlinenum() instead of comlineapp(), which means that it numerically approximates the integrals differently.  resnum() requires one more argument than resapp, n, which is the number of rectangles used in the Riemann integration approximation divided by 1000. resnum()'s accuracy depends on how large n is, but it is very slow even when n is one.  It has the advantage of being less likely to fail than comlineapp().*/
+
+resnum(f,p,k,n):=
+rectform(float((1/(2*%pi*%i))*(comlinenum(f,k*(1+%i*t)+p,-1,1,n)+comlinenum(f,k*(-t+%i)+p,-1,1,n)+comlinenum(f,k*(-1-%i*t)+p,-1,1,n)+comlinenum(f,k*(t-%i)+p,-1,1,n))));
+
+
+
+
+
+
+/*orderpole() finds the order of a pole for function f at point p.  It first tests to see if the limit of the function at that point is infinity (and by using the absolute value, it tests for all types of infinity that Maxima returns, "minf" (negative real infinity), "inf" (positive real infinity), and "infinity" (complex point at infinity) ), and if the point is not a pole then it returns "No pole." opf() is a recursive function used in orderpole().*/
+
+opf(f,p,k):=
+if is(notequal(abs(limit(f*(z-p)^k,z,p)),inf)) then k else opf(f,p,k+1);
+
+orderpole(f,p):=
+if is(notequal(abs(limit(f,z,p)),inf)) then "No pole" else
+opf(f,p,1);
+
+
+
+
+/*orderpoleold() is the older version of orderpole(), with longer and more unwieldy code.  It finds the order of a pole for function f at point p.  It first tests to see if the limit of the function at that point is infinity, and if it is not then it returns "No pole."  It only checks up to order 10, and returns "Greater than 10" if the pole is greater than 10. */
+
+orderpoleold(f,p):= 
+if is(notequal(limit(f,z,p),infinity)) and is(notequal(limit(f,z,p),inf)) then "No pole" else
+block(
+a:"Greater than 10",
+for k:0 thru 10 do if 
+    is(equal(limit(f*(z-p)^k,z,p),infinity)) or is(equal(limit(f*(z-p)^k,z,p),inf)) or is(equal(limit(f*(z-p)^k,z,p),0))
+    then
+        20
+    else
+        a:k,
+a);
+
+
+
+/*orderzero() finds the order of the zero at point p. If it is not zero at point p, it returns "Not zero at point."  This is true for removable singularities, because it checks for the limit rather than just evaluating z at p. ozf() is a recursive function that is used in orderzero().*/
+
+ozf(f,p,k):=
+if is(notequal(limit(f/(z-p)^k,z,p),0)) then k else ozf(f,p,k+1);
+
+orderzero(f,p):=
+if is(notequal(limit(f,z,p),0)) then "Not zero at point" else
+ozf(f,p,1);
+
+
+
+
+/*respole() finds the residue of function f at point p using the formula derived from Cauchy's integral formula for derivatives.  As such, it is much more successful and faster than the previous residue functions, but only works when p is a pole (and not for essential singularities).  respole() uses orderpole() to find the order of the pole, therefore it is not necessary for the user to manually discover what the order of the pole is.  Maxima's native residue() is still better than this, though.  */
+
+respole(f,p):=
+block(
+k:orderpole(f,p),
+rectform(limit(1/(k-1)!*diff((z-p)^k*f,z,k-1),z,p)));
+
+
+
+
+
+/* comfactor() is a simple script that factors expressions into its complex roots (i.e., the fundamental theorem of algebra).  Uses "solve," so if Maxima has a hard time finding the zeros of the expression, it will have difficulty finding the complex factorization.  This differs from gfactors() in that it should factor into all roots, not just the integer roots. */
+
+comfactor(expr,x):=
+block(
+zeros:solve(expr,x),
+factors:[],
+for k:1 thru length(zeros) do factors:append(factors,[(x-rhs(zeros[k]))^multiplicities[k]]),
+ans:product(factors[j],j,1,length(factors)),
+ans*ratsimp(expr/expand(ans)));
+
+
+
+
+/* order() combines orderpole() and orderzero(), by testing them both, and tells you if it's neither a pole nor zero.  */
+
+order(f,p):=
+if numberp(orderzero(f,p)) then ["Zero of order:",orderzero(f,p)] else
+if numberp(orderpole(f,p)) then ["Pole of order:",orderpole(f,p)] else
+"Neither a pole nor zero at point.";
